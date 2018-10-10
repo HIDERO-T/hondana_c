@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package barcodereader;
+package com.tanaka.hondana.hondana.barcodereader;
 
 import android.content.Context;
 
-import barcodereader.ui.camera.GraphicOverlay;
+import com.tanaka.hondana.hondana.barcodereader.ui.camera.GraphicOverlay;
 import com.google.android.gms.vision.MultiProcessor;
 import com.google.android.gms.vision.Tracker;
 import com.google.android.gms.vision.barcode.Barcode;
