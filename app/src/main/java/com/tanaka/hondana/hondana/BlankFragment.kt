@@ -84,7 +84,9 @@ class BlankFragment : Fragment() {
         listener = null
     }
 
+
     private fun applyData(v: View, isbn: String){
+        /*
         val bookstock = BookStock(isbn)
         val bookinfo = BookInfo(isbn)
         v.findViewById<TextView>(R.id.textIsbn).text = isbn
@@ -95,6 +97,7 @@ class BlankFragment : Fragment() {
         v.findViewById<TextView>(R.id.numberAvailable).text = bookstock.numberAvailable!!.toString() + getString(R.string.book_unit)
         v.findViewById<Button>(R.id.buttonBorrow).isEnabled = bookstock.canBorrow
         v.findViewById<Button>(R.id.buttonReturn).isEnabled = bookstock.canReturn!!
+        */
     }
 
 

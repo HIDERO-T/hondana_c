@@ -4,11 +4,15 @@ import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
 import android.os.AsyncTask
+import android.util.Log
+import org.json.JSONObject
 import java.io.*
+import java.util.*
 
 
 //TODO: Nullableでない設計に変更スべき。
 
+/*
 class Book(id: Int){
     var status: Int? = null
     var registerer: String? = null
@@ -29,6 +33,9 @@ class Book(id: Int){
     }
 }
 
+*/
+/*
+
 class BookStock(isbn: String){
     var books: List<Book>? = null
     var numberAll: Int? = null
@@ -39,6 +46,8 @@ class BookStock(isbn: String){
 
     init{
         //TODO:API接続
+
+
         books = listOf(Book(1), Book(2))
         numberAll = books?.size
         numberOnloan = books?.count { it.status == Book.ONLOAN }
@@ -58,17 +67,12 @@ class BookInfo(isbn: String){
     }
 }
 
-class HttpResponsAsync : AsyncTask<Void, Void, String>() {
+class HttpResponsAsync : AsyncTask<String, String, String>()  {
 
-    override fun onPreExecute() {
-        super.onPreExecute()
-        // doInBackground前処理
-    }
-
-    override fun doInBackground(vararg params: Void): String? {
+    override fun doInBackground(vararg params: String): String? {
         var con: HttpURLConnection? = null
         var url: URL? = null
-        val urlSt = "http://125.12.14.155:3000/books/"
+        val urlSt = params[0]
 
         try {
             // URLの作成
@@ -82,7 +86,7 @@ class HttpResponsAsync : AsyncTask<Void, Void, String>() {
             // URL接続からデータを読み取る場合はtrue
             con!!.setDoInput(true)
             // URL接続にデータを書き込む場合はtrue
-            con!!.setDoOutput(true)
+            con!!.setDoOutput(false)
 
             // 接続
             con!!.connect() // ①
@@ -93,32 +97,40 @@ class HttpResponsAsync : AsyncTask<Void, Void, String>() {
             e.printStackTrace()
         }
 
-
-        return null
+// 本文の取得
+        val input = con!!.inputStream
+        return readInputStream(input)
     }
 
     override fun onPostExecute(result: String) {
         super.onPostExecute(result)
+        Log.d("BookUtil", result)
+        val json = JSONObject(result)
+        val numb = json.getString("id")
+
         // doInBackground後処理
     }
 
-}
+    @Throws(IOException::class, UnsupportedEncodingException::class)
+    fun readInputStream(input: InputStream): String {
+        val sb = StringBuffer()
+        var st: String?
 
-@Throws(IOException::class, UnsupportedEncodingException::class)
-fun readInputStream(`in`: InputStream): String {
-    val sb = StringBuffer()
-    var st = ""
-
-    val br = BufferedReader(InputStreamReader(`in`, "UTF-8"))
-    while (st != null) {
-        sb.append(st)
+        val br = BufferedReader(InputStreamReader(input, "UTF-8"))
         st = br.readLine()
-    }
-    try {
-        `in`.close()
-    } catch (e: Exception) {
-        e.printStackTrace()
+        while (st != null) {
+            sb.append(st)
+            st = br.readLine()
+        }
+
+        try {
+            input.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return sb.toString()
     }
 
-    return sb.toString()
 }
+*/

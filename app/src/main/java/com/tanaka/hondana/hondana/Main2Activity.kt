@@ -1,25 +1,10 @@
-/*
- * Copyright (C) The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-package com.tanaka.hondana.hondana.barcodereader
+package com.tanaka.hondana.hondana
 
 import android.Manifest
+import android.accounts.*
+import android.accounts.AccountManager.newChooseAccountIntent
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.AlertDialog
-import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
@@ -29,41 +14,37 @@ import android.hardware.Camera
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.support.constraint.ConstraintLayout
-import android.support.constraint.R.id.gone
 import android.support.design.widget.Snackbar
+import android.support.design.widget.NavigationView
 import android.support.v4.app.ActivityCompat
+import android.support.v4.view.GravityCompat
+import android.support.v7.app.ActionBarDrawerToggle
 import android.support.v7.app.AppCompatActivity
-import android.support.v7.widget.Toolbar
 import android.util.Log
-import android.view.GestureDetector
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
-import android.view.View
-import android.widget.TextView
+import android.view.*
+import android.widget.ProgressBar
 import android.widget.Toast
-
+import com.google.android.gms.common.AccountPicker
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.api.CommonStatusCodes
-import com.tanaka.hondana.hondana.barcodereader.ui.camera.CameraSource
-import com.tanaka.hondana.hondana.barcodereader.ui.camera.CameraSourcePreview
-import com.tanaka.hondana.hondana.barcodereader.ui.camera.GraphicOverlay
 import com.google.android.gms.vision.MultiProcessor
 import com.google.android.gms.vision.barcode.Barcode
 import com.google.android.gms.vision.barcode.BarcodeDetector
-import com.tanaka.hondana.hondana.*
+import com.tanaka.hondana.hondana.barcodereader.BarcodeCaptureActivity
+import com.tanaka.hondana.hondana.barcodereader.BarcodeGraphic
+import com.tanaka.hondana.hondana.barcodereader.BarcodeGraphicTracker
+import com.tanaka.hondana.hondana.barcodereader.BarcodeTrackerFactory
+import com.tanaka.hondana.hondana.barcodereader.ui.camera.CameraSource
+import com.tanaka.hondana.hondana.barcodereader.ui.camera.CameraSourcePreview
+import com.tanaka.hondana.hondana.barcodereader.ui.camera.GraphicOverlay
+import kotlinx.android.synthetic.main.activity_main2.*
 import kotlinx.android.synthetic.main.app_bar_main2.*
-
+import kotlinx.android.synthetic.main.content_main2.*
 import java.io.IOException
 import java.util.regex.Pattern
 
-/**
- * Activity for the multi-tracker app.  This app detects barcodes and displays the value with the
- * rear facing camera. During detection overlay graphics are drawn to indicate the position,
- * size, and ID of each barcode.
- */
-class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateListener, BlankFragment.OnFragmentInteractionListener {
+class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener, BarcodeGraphicTracker.BarcodeUpdateListener, BlankFragment.OnFragmentInteractionListener  {
 
     private var mCameraSource: CameraSource? = null
     private var mPreview: CameraSourcePreview? = null
@@ -73,29 +54,43 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
     private var scaleGestureDetector: ScaleGestureDetector? = null
     private var gestureDetector: GestureDetector? = null
 
-    /**
-     * Initializes the UI and creates the detector pipeline.
-     */
-    public override fun onCreate(icicle: Bundle?) {
-        super.onCreate(icicle)
-        setContentView(R.layout.barcode_capture)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main2)
+//        setSupportActionBar(toolbar)
 
 
+        val toggle = ActionBarDrawerToggle(
+                this, drawer_layout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close)
+        drawer_layout.addDrawerListener(toggle)
+        toggle.syncState()
+
+        //separator
+
+        nav_view.setNavigationItemSelectedListener(this)
         mPreview = findViewById<View>(R.id.preview) as CameraSourcePreview
         mGraphicOverlay = findViewById<View>(R.id.graphicOverlay) as GraphicOverlay<BarcodeGraphic>
 
         // read parameters from the intent used to launch the activity.
-        val autoFocus = intent.getBooleanExtra(AutoFocus, true)
-        val useFlash = intent.getBooleanExtra(UseFlash, false)
+        val autoFocus = intent.getBooleanExtra(BarcodeCaptureActivity.AutoFocus, true)
+        val useFlash = intent.getBooleanExtra(BarcodeCaptureActivity.UseFlash, false)
 
         // Check for the camera permission before accessing the camera.  If the
         // permission is not granted yet, request permission.
-        val rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+        var lst: MutableList<String> = mutableListOf()
+        var rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
         if (rc == PackageManager.PERMISSION_GRANTED) {
             createCameraSource(autoFocus, useFlash)
         } else {
-            requestCameraPermission()
+            Log.d(TAG, "Camera not granted")
+            lst.add(Manifest.permission.CAMERA)
         }
+        rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.GET_ACCOUNTS)
+        if (rc != PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "Acc not granted")
+            lst.add(Manifest.permission.GET_ACCOUNTS)
+        }
+        if (lst.size != 0) requestPermission(lst)
 
         gestureDetector = GestureDetector(this, CaptureGestureListener())
         scaleGestureDetector = ScaleGestureDetector(this, ScaleListener())
@@ -103,21 +98,68 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
         Snackbar.make(mGraphicOverlay!!, "Tap to capture. Pinch/Stretch to zoom",
                 Snackbar.LENGTH_LONG)
                 .show()
+
     }
 
-    /**
-     * Handles the requesting of the camera permission.  This includes
-     * showing a "Snackbar" message of why the permission is needed then
-     * sending the request.
-     */
-    private fun requestCameraPermission() {
-        Log.w(TAG, "Camera permission is not granted. Requesting permission")
+    override fun onBackPressed() {
+        if (drawer_layout.isDrawerOpen(GravityCompat.START)) {
+            drawer_layout.closeDrawer(GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
+    }
 
-        val permissions = arrayOf(Manifest.permission.CAMERA)
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        menuInflater.inflate(R.menu.main2, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+        when (item.itemId) {
+            R.id.action_settings -> return true
+            else -> return super.onOptionsItemSelected(item)
+        }
+    }
+
+    override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        // Handle navigation view item clicks here.
+        when (item.itemId) {
+            R.id.nav_main -> {
+                drawer_layout.closeDrawer(GravityCompat.START)
+            }
+            R.id.nav_register -> {
+
+            }
+            R.id.nav_search -> {
+                startActivity(Intent(this, SearchActivity::class.java))
+            }
+            R.id.nav_list -> {
+                startActivity(Intent(this, ListActivity::class.java))
+            }
+            R.id.nav_config -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+            }
+        }
+
+        drawer_layout.closeDrawer(GravityCompat.START)
+        return true
+    }
+
+
+    //sep
+
+    private fun requestPermission(lst: MutableList<String>){
+        Log.w( Main2Activity.TAG, "Some permission is not granted. Requesting permission")
+
+        val permissions = lst.toTypedArray()
 
         if (!ActivityCompat.shouldShowRequestPermissionRationale(this,
                         Manifest.permission.CAMERA)) {
-            ActivityCompat.requestPermissions(this, permissions, RC_HANDLE_CAMERA_PERM)
+            ActivityCompat.requestPermissions(this, permissions, Main2Activity.RC_HANDLE_CAMERA_PERM)
             return
         }
 
@@ -125,7 +167,7 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
 
         val listener = View.OnClickListener {
             ActivityCompat.requestPermissions(thisActivity, permissions,
-                    RC_HANDLE_CAMERA_PERM)
+                    Main2Activity.RC_HANDLE_CAMERA_PERM)
         }
 
         findViewById<View>(R.id.topLayout).setOnClickListener(listener)
@@ -133,7 +175,12 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
                 Snackbar.LENGTH_INDEFINITE)
                 .setAction("OK", listener)
                 .show()
+
     }
+
+
+
+
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         val b = scaleGestureDetector!!.onTouchEvent(e)
@@ -174,7 +221,7 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
             // isOperational() can be used to check if the required native libraries are currently
             // available.  The detectors will automatically become operational once the library
             // downloads complete on device.
-            Log.w(TAG, "Detector dependencies are not yet available.")
+            Log.w( Main2Activity.TAG, "Detector dependencies are not yet available.")
 
             // Check for low storage.  If there is low storage, the native library will not be
             // downloaded, so detection will not become operational.
@@ -183,7 +230,7 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
 
             if (hasLowStorage) {
                 Toast.makeText(this, "ストレージ少ないよ！", Toast.LENGTH_LONG).show()
-                Log.w(TAG, "ストレージ少ないよ！")
+                Log.w( Main2Activity.TAG, "ストレージ少ないよ！")
             }
         }
 
@@ -205,12 +252,51 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
                 .setFlashMode(if (useFlash) Camera.Parameters.FLASH_MODE_TORCH else null)
                 .build()
     }
-
-    /**
-     * Restarts the camera.
-     */
     override fun onResume() {
         super.onResume()
+        findViewById<ProgressBar>(R.id.progressBar2).visibility = View.INVISIBLE
+
+
+        //TODO: accountmanagerが使用できない。（理由不明）
+        /*
+        Log.d(TAG, ActivityCompat.checkSelfPermission(this, Manifest.permission.GET_ACCOUNTS).toString())
+        val rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.GET_ACCOUNTS)
+        if (rc == PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "ACOCUNT OK")
+        } else {
+            Log.d(TAG, "ACOCUNT NG")
+            return
+        }
+
+        val acc = AccountManager.get(this).accounts
+        val manager = AccountManager.get(this)
+        val accountArray = manager.accounts
+        Log.d(TAG, manager.toString())
+        Log.d(TAG, acc.size.toString())
+        Log.d(TAG, manager.getAccountsByType("com.google").size.toString())
+        manager.getAuthToken(Account(accountArray[0].toString(), "com.google"), "mail", null,
+                this, { future ->
+            var bundle: Bundle? = null
+            try {
+                bundle = future.result
+                val accountName = bundle!!.getString(AccountManager.KEY_ACCOUNT_NAME)
+                val accountType = bundle.getString(AccountManager.KEY_ACCOUNT_TYPE)
+                val authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN)
+                Log.d("account", accountName)
+                Toast.makeText(this@Main2Activity, authToken, Toast.LENGTH_SHORT).show()
+            } catch (e: OperationCanceledException) {
+                e.printStackTrace()
+            } catch (e: IOException) {
+                e.printStackTrace()
+            } catch (e: AuthenticatorException) {
+                e.printStackTrace()
+            }
+        }, null)
+        */
+
+
+
+
         startCameraSource()
     }
 
@@ -255,18 +341,23 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
     override fun onRequestPermissionsResult(requestCode: Int,
                                             permissions: Array<String>,
                                             grantResults: IntArray) {
-        if (requestCode != RC_HANDLE_CAMERA_PERM) {
+        if (requestCode == RC_ACCOUNT){
+            if (grantResults.size != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                Log.d(TAG, "Account permission granted")
+                return
+            }
+        } else if (requestCode == RC_HANDLE_CAMERA_PERM) {
+            if (grantResults.size != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "BOTh permission granted - initialize the camera source")
+                // we have permission, so create the camerasource
+                val autoFocus = intent.getBooleanExtra(AutoFocus, false)
+                val useFlash = intent.getBooleanExtra(UseFlash, false)
+                createCameraSource(autoFocus, useFlash)
+                return
+            }
+        } else {
             Log.d(TAG, "Got unexpected permission result: $requestCode")
             super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-            return
-        }
-
-        if (grantResults.size != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "Camera permission granted - initialize the camera source")
-            // we have permission, so create the camerasource
-            val autoFocus = intent.getBooleanExtra(AutoFocus, false)
-            val useFlash = intent.getBooleanExtra(UseFlash, false)
-            createCameraSource(autoFocus, useFlash)
             return
         }
 
@@ -412,6 +503,7 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
 
     override fun onBarcodeDetected(barcode: Barcode) {
         //do something with barcode data returned
+        findViewById<ProgressBar>(R.id.progressBar2).visibility = View.VISIBLE
 
         val p: Pattern = Pattern.compile("^97[89]")
         if (!p.matcher(barcode.rawValue).find()) return
@@ -435,10 +527,14 @@ class BarcodeCaptureActivity : AppCompatActivity(), BarcodeGraphicTracker.Barcod
         // permission request codes need to be < 256
         private val RC_HANDLE_CAMERA_PERM = 2
 
+        private val RC_ACCOUNT = 15
+
+        private val REQUEST_CODE = 4
         // constants used to pass extra data in the intent
         val AutoFocus = "AutoFocus"
         val UseFlash = "UseFlash"
         val BarcodeObject = "Barcode"
     }
+
 
 }

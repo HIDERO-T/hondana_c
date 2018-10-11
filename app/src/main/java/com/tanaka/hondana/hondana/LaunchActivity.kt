@@ -14,6 +14,16 @@ import com.google.android.gms.vision.Frame
 import com.google.android.gms.vision.barcode.Barcode
 import com.google.android.gms.vision.barcode.BarcodeDetector
 import com.tanaka.hondana.hondana.barcodereader.BarcodeCaptureActivity
+import android.accounts.AccountManager
+import android.accounts.AuthenticatorException
+import android.widget.Toast
+import android.accounts.AccountManagerFuture
+import android.accounts.AccountManagerCallback
+import android.accounts.Account
+
+
+
+
 
 class LaunchActivity : AppCompatActivity() {
 
@@ -29,6 +39,8 @@ class LaunchActivity : AppCompatActivity() {
             val intent: Intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
         }
+
+
 
 
     }
