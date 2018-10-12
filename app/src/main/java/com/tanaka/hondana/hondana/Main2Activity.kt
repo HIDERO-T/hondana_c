@@ -2,8 +2,9 @@ package com.tanaka.hondana.hondana
 
 import android.Manifest
 import android.accounts.*
-import android.accounts.AccountManager.newChooseAccountIntent
+import android.accounts.AccountManager.*
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
@@ -23,6 +24,7 @@ import android.support.v7.app.AppCompatActivity
 import android.util.Log
 import android.view.*
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import com.google.android.gms.common.AccountPicker
 import com.google.android.gms.common.ConnectionResult
@@ -45,6 +47,8 @@ import java.io.IOException
 import java.util.regex.Pattern
 
 class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener, BarcodeGraphicTracker.BarcodeUpdateListener, BlankFragment.OnFragmentInteractionListener  {
+
+    var userAccount: String? = null
 
     private var mCameraSource: CameraSource? = null
     private var mPreview: CameraSourcePreview? = null
@@ -95,10 +99,13 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         gestureDetector = GestureDetector(this, CaptureGestureListener())
         scaleGestureDetector = ScaleGestureDetector(this, ScaleListener())
 
-        Snackbar.make(mGraphicOverlay!!, "Tap to capture. Pinch/Stretch to zoom",
-                Snackbar.LENGTH_LONG)
-                .show()
-
+        if(Build.VERSION.SDK_INT <= 22){
+            userAccount = AccountManager.get(this).getAccountsByType("com.google")[0].name
+        }else if(Build.VERSION.SDK_INT >= 23){
+            val intent: Intent = AccountManager.newChooseAccountIntent(null, null, arrayOf("com.google"), null, null, null,
+                    null)
+            startActivityForResult(intent, REQUEST_CODE)
+        }
     }
 
     override fun onBackPressed() {
@@ -148,8 +155,6 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         drawer_layout.closeDrawer(GravityCompat.START)
         return true
     }
-
-
     //sep
 
     private fun requestPermission(lst: MutableList<String>){
@@ -178,9 +183,21 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
 
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, intent)
+        if (requestCode == REQUEST_CODE) {
+            val received = data!!
+            userAccount = received.extras.get(KEY_ACCOUNT_NAME).toString()
+            Toast.makeText(this, "${userAccount}でログインしました。", Toast.LENGTH_LONG).show()
+            findViewById<TextView>(R.id.textAccount).text = userAccount
+        }
+    }
 
-
-
+    override fun onResume() {
+        super.onResume()
+        findViewById<ProgressBar>(R.id.progressBar2).visibility = View.INVISIBLE
+        startCameraSource()
+    }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         val b = scaleGestureDetector!!.onTouchEvent(e)
@@ -252,53 +269,6 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
                 .setFlashMode(if (useFlash) Camera.Parameters.FLASH_MODE_TORCH else null)
                 .build()
     }
-    override fun onResume() {
-        super.onResume()
-        findViewById<ProgressBar>(R.id.progressBar2).visibility = View.INVISIBLE
-
-
-        //TODO: accountmanagerが使用できない。（理由不明）
-        /*
-        Log.d(TAG, ActivityCompat.checkSelfPermission(this, Manifest.permission.GET_ACCOUNTS).toString())
-        val rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.GET_ACCOUNTS)
-        if (rc == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "ACOCUNT OK")
-        } else {
-            Log.d(TAG, "ACOCUNT NG")
-            return
-        }
-
-        val acc = AccountManager.get(this).accounts
-        val manager = AccountManager.get(this)
-        val accountArray = manager.accounts
-        Log.d(TAG, manager.toString())
-        Log.d(TAG, acc.size.toString())
-        Log.d(TAG, manager.getAccountsByType("com.google").size.toString())
-        manager.getAuthToken(Account(accountArray[0].toString(), "com.google"), "mail", null,
-                this, { future ->
-            var bundle: Bundle? = null
-            try {
-                bundle = future.result
-                val accountName = bundle!!.getString(AccountManager.KEY_ACCOUNT_NAME)
-                val accountType = bundle.getString(AccountManager.KEY_ACCOUNT_TYPE)
-                val authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN)
-                Log.d("account", accountName)
-                Toast.makeText(this@Main2Activity, authToken, Toast.LENGTH_SHORT).show()
-            } catch (e: OperationCanceledException) {
-                e.printStackTrace()
-            } catch (e: IOException) {
-                e.printStackTrace()
-            } catch (e: AuthenticatorException) {
-                e.printStackTrace()
-            }
-        }, null)
-        */
-
-
-
-
-        startCameraSource()
-    }
 
     /**
      * Stops the camera.
@@ -338,6 +308,8 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
      * or [PackageManager.PERMISSION_DENIED]. Never null.
      * @see .requestPermissions
      */
+    //TODO: グチャグチャ。リファクタ必要。
+
     override fun onRequestPermissionsResult(requestCode: Int,
                                             permissions: Array<String>,
                                             grantResults: IntArray) {
@@ -505,21 +477,22 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         //do something with barcode data returned
         findViewById<ProgressBar>(R.id.progressBar2).visibility = View.VISIBLE
 
-        val p: Pattern = Pattern.compile("^97[89]")
-        if (!p.matcher(barcode.rawValue).find()) return
+        if (!isIsbn(barcode.rawValue)) return
 
         //TODO: フラグメントどうするか検討。
         val intent: Intent = Intent(this, MainActivity::class.java)
         intent.putExtra("barcode", barcode.rawValue)
+        intent.putExtra("userAccount", userAccount)
         startActivity(intent)
     }
+
+    private fun isIsbn(barcode: String) = Pattern.compile("^97[89]").matcher(barcode).find()
 
     override fun onFragmentInteraction(uri: Uri) {
     }
 
-
     companion object {
-        private val TAG = "Barcode-reader"
+        private val TAG = "MainActivity2"
 
         // intent request code to handle updating play services if needed.
         private val RC_HANDLE_GMS = 9001

@@ -27,6 +27,7 @@ class MainActivity : AppCompatActivity() {
 
     var toBeBorrowed: Int? = null
     var toBeReturned: Int? = null
+    var userAccount: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +38,8 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
 
         val barcode: String = intent.getStringExtra("barcode")
+        userAccount = intent.getStringExtra("userAccount")
+
         applyData(barcode)
 
         findViewById<Button>(R.id.buttonBorrow).setOnClickListener{
@@ -44,7 +47,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "その本は借りられません。", Toast.LENGTH_SHORT).show()
             }else {
                 val url = "$BASE_ADDR/api/books/borrow"
-                Fuel.post(url, listOf("id" to toBeBorrowed, "user" to TEMP_USER_NAME)).response { request, response, result ->
+                Fuel.post(url, listOf("id" to toBeBorrowed, "user" to userAccount)).response { request, response, result ->
                     when (result) {
                         is Result.Success -> {
                             Toast.makeText(this, "借りました！", Toast.LENGTH_SHORT).show()
@@ -115,9 +118,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.numberAvailable).text = books.books.count{it.holder == "office@r-learning.co.jp"}.toString() + getString(R.string.book_unit)
         println(books.books.firstOrNull{it.holder == "office@r-learning.co.jp"}?.id.toString())
         toBeBorrowed = books.books.firstOrNull{it.holder == "office@r-learning.co.jp"}?.id
-        toBeReturned = books.books.firstOrNull{it.holder == TEMP_USER_NAME}?.id
+        toBeReturned = books.books.firstOrNull{it.holder == userAccount}?.id
         findViewById<Button>(R.id.buttonBorrow).isEnabled = ( books.books.count{it.holder == "office@r-learning.co.jp"} > 0)
-        findViewById<Button>(R.id.buttonReturn).isEnabled = (books.books.count{it.holder == TEMP_USER_NAME} > 0)
+        findViewById<Button>(R.id.buttonReturn).isEnabled = (books.books.count{it.holder == userAccount} > 0)
 
     }
 
