@@ -1,31 +1,36 @@
 package com.tanaka.hondana.hondana
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.AsyncTask
+import java.io.*
+import java.util.*
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
-import android.os.AsyncTask
+import android.os.AsyncTask.execute
+import android.provider.Settings.Global.getString
 import android.util.Log
+import com.tanaka.hondana.hondana.GetBookStockAsync.CallBackTask
+import java.lang.Thread.sleep
 import org.json.JSONObject
-import java.io.*
-import java.util.*
+import java.nio.file.Files.size
 
+
+const val BASE_ADDR: String = "http://125.12.14.155:3000"
 
 //TODO: Nullableでない設計に変更スべき。
-
-/*
-class Book(id: Int){
-    var status: Int? = null
-    var registerer: String? = null
-    var holder: String? = null
-    init{
-        //TODO:API接続
-        registerer = "a-saito@r-learning.co.jp"
-        holder = "h-tanaka@r-learning.co.jp"
-
-        //TODO:ログインできてから。
-        status = AVAILABLE
+class Book(data: JSONObject){
+    var id: Int = 0
+    var holder: String = ""
+    var registerer: String = ""
+    var duedate: Date = Date()
+    init {
+        id = data.getString("id").toInt()
+        holder = data.getString("holder")
+        registerer = data.getString("registerer")
+        //duedate = SimpleDateFormat.parse(data.getString("duedate"))
     }
-
     companion object {
         const val HOLDBYME = 3
         const val ONLOAN = 2
@@ -33,104 +38,204 @@ class Book(id: Int){
     }
 }
 
-*/
-/*
-
-class BookStock(isbn: String){
-    var books: List<Book>? = null
+//TODO: userAccountを渡すのはややダサい
+class BookStock(rawString: String, userAccount: String){
+    var books: MutableList<Book> = mutableListOf()
     var numberAll: Int? = null
     var numberOnloan: Int? = null
     var numberAvailable: Int? = null
     var canBorrow: Boolean = false
-    var canReturn: Boolean? = false
+    var canReturn: Boolean = false
+    var toBeBorrowed: Int? = 0
+    var toBeReturned: Int? = 0
+    var isbn: String = ""
+    var title: String = ""
+    var author: String = ""
 
     init{
-        //TODO:API接続
-
-
-        books = listOf(Book(1), Book(2))
-        numberAll = books?.size
-        numberOnloan = books?.count { it.status == Book.ONLOAN }
-        numberAvailable = books?.count { it.status == Book.AVAILABLE }
-        canBorrow = (numberAvailable!! > 0)
-        canReturn = books?.any{ it.status == Book.HOLDBYME }
+        val jsonData = JSONObject(rawString).getJSONArray("books")
+        for (i in 0 until jsonData.length()) {
+            val data = jsonData.getJSONObject(i)
+            books.add(Book(data))
+        }
+        numberAll = books.size
+        numberOnloan = books.count { it.holder != OFFICE }
+        numberAvailable = books.count { it.holder == OFFICE }
+        canReturn = books.count { it.holder == userAccount } > 0
+        canBorrow = books.count { it.holder == OFFICE } >0
+        toBeReturned = books.firstOrNull { it.holder == userAccount }?.id
+        toBeBorrowed = books.firstOrNull { it.holder == OFFICE }?.id
+        val jsonDataInfo = JSONObject(rawString).getJSONArray("infos").getJSONObject(0)
+        isbn = jsonDataInfo.getString("isbn")
+        title = jsonDataInfo.getString("title")
+        author = jsonDataInfo.getString("author")
+    }
+    companion object{
+        private const val OFFICE = "office@r-learning.co.jp"
     }
 }
 
-class BookInfo(isbn: String){
-    var title: String? = null
-    var author: String? = null
-    init{
-        //TODO: API接続
-        title = "Ruby公式"
-        author = "増井雄一郎"
-    }
-}
-
-class HttpResponsAsync : AsyncTask<String, String, String>()  {
+class GetBookStockAsync : AsyncTask<String, Void, String>() {
+    private var callbacktask: CallBackTask? = null
 
     override fun doInBackground(vararg params: String): String? {
         var con: HttpURLConnection? = null
         var url: URL? = null
-        val urlSt = params[0]
 
         try {
-            // URLの作成
-            url = URL(urlSt)
-            // 接続用HttpURLConnectionオブジェクト作成
+            url = URL(BASE_ADDR + "/api/books/isbn/${params[0]}")
             con = url!!.openConnection() as HttpURLConnection
-            // リクエストメソッドの設定
             con!!.setRequestMethod("GET")
-            // リダイレクトを自動で許可しない設定
             con!!.setInstanceFollowRedirects(false)
-            // URL接続からデータを読み取る場合はtrue
             con!!.setDoInput(true)
-            // URL接続にデータを書き込む場合はtrue
             con!!.setDoOutput(false)
+            con.connect()
 
-            // 接続
-            con!!.connect() // ①
-
+            val `in` = con.getInputStream()
+            val readSt = readInputStream(`in`)
+            return readSt
         } catch (e: MalformedURLException) {
             e.printStackTrace()
         } catch (e: IOException) {
             e.printStackTrace()
         }
-
-// 本文の取得
-        val input = con!!.inputStream
-        return readInputStream(input)
+        return null
     }
 
     override fun onPostExecute(result: String) {
         super.onPostExecute(result)
-        Log.d("BookUtil", result)
-        val json = JSONObject(result)
-        val numb = json.getString("id")
+        callbacktask!!.callBack(result)
+    }
+    fun setOnCallBack(_cbj: CallBackTask) {
+        callbacktask = _cbj
+    }
+    companion object{
+        private const val TAG = "GetBookStockAsync"
+    }
+    open class CallBackTask {
+        open fun callBack(result: String) {}
+    }
+}
+class GetCoverImageAsync : AsyncTask<String, Void, Bitmap>() {
+    private var callbacktask: CallBackTask? = null
 
-        // doInBackground後処理
+    override fun doInBackground(vararg params: String): Bitmap? {
+        var con: HttpURLConnection? = null
+        var url: URL? = null
+
+        try {
+            url = URL(BASE_ADDR + "/api/images/${params[0]}")
+            con = url!!.openConnection() as HttpURLConnection
+            con!!.setRequestMethod("GET")
+            con!!.setInstanceFollowRedirects(false)
+            con!!.setDoInput(true)
+            con!!.setDoOutput(false)
+            con.connect()
+
+            val `in` = con.getInputStream()
+            Log.d(TAG, "GET OK.")
+            val bitmap = BitmapFactory.decodeStream(`in`)
+            return bitmap
+        } catch (e: MalformedURLException) {
+            e.printStackTrace()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return null
     }
 
-    @Throws(IOException::class, UnsupportedEncodingException::class)
-    fun readInputStream(input: InputStream): String {
-        val sb = StringBuffer()
-        var st: String?
+    override fun onPostExecute(result: Bitmap) {
+        super.onPostExecute(result)
+        callbacktask!!.callBack(result)
+    }
+    fun setOnCallBack(_cbj: CallBackTask) {
+        callbacktask = _cbj
+    }
+    companion object{
+        private const val TAG = "GetCoverImageAsync"
+    }
+    open class CallBackTask {
+        open fun callBack(result: Bitmap) {}
+    }
+}
 
-        val br = BufferedReader(InputStreamReader(input, "UTF-8"))
-        st = br.readLine()
-        while (st != null) {
-            sb.append(st)
-            st = br.readLine()
+class BookBorrowReturnAsync : AsyncTask<String, Void, String>() {
+    private var callbacktask: CallBackTask? = null
+
+    override fun doInBackground(vararg params: String): String? {
+        var con: HttpURLConnection? = null
+        var url: URL? = null
+        val id = params[1].toInt()
+        val param = if (params[0] == BORROW) {
+            "id=$id&user=${params[2]}"
+        }else if (params[0] == RETURN){
+            "id=$id"
+        }else{
+            throw RuntimeException()
         }
 
         try {
-            input.close()
-        } catch (e: Exception) {
+            url = URL(BASE_ADDR + "/api/books/${params[0]}")
+            con = url!!.openConnection() as HttpURLConnection
+            con!!.setRequestMethod("POST")
+            con!!.setInstanceFollowRedirects(false)
+            con!!.setDoInput(true)
+            con!!.setDoOutput(true)
+            con.connect()
+            Log.d(TAG,"Connection OK")
+
+            val outputStream = con.getOutputStream()
+            val ps = PrintStream(con.getOutputStream())
+            ps.print(param)
+            ps.close()
+            outputStream.close()
+            Log.d(TAG, "Output OK")
+
+            Log.d(TAG, "Status: ${con.getResponseCode()}")
+            val `in` = con.getInputStream()
+            Log.d(TAG, "GET OK.")
+            val readSt = readInputStream(`in`)
+            return readSt
+        } catch (e: MalformedURLException) {
+            e.printStackTrace()
+        } catch (e: IOException) {
             e.printStackTrace()
         }
-
-        return sb.toString()
+        return null
     }
 
+    override fun onPostExecute(result: String) {
+        super.onPostExecute(result)
+        callbacktask!!.callBack(result)
+    }
+    fun setOnCallBack(_cbj: CallBackTask) {
+        callbacktask = _cbj
+    }
+    companion object{
+        private const val TAG = "BookBorrowReturnAsync"
+        private const val BORROW = "borrow"
+        private const val RETURN = "return"
+    }
+    open class CallBackTask {
+        open fun callBack(result: String) {}
+    }
 }
-*/
+
+@Throws(IOException::class, UnsupportedEncodingException::class)
+fun readInputStream(`in`: InputStream): String {
+    val sb = StringBuffer()
+    var st: String? = ""
+
+    val br = BufferedReader(InputStreamReader(`in`, "UTF-8"))
+    st = br.readLine()
+    while (st != null) {
+        sb.append(st)
+        st = br.readLine()
+    }
+    try {
+        `in`.close()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return sb.toString()
+}
