@@ -3,13 +3,15 @@
     package="com.tanaka.hondana.hondana">
 
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
-    <uses-permission android:name="android.permission.USE_CREDENTIALS"/>
-    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS"/>
+    <uses-permission android:name="android.permission.USE_CREDENTIALS" />
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature android:name="android.hardware.camera" />
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_PROFILE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
         android:allowBackup="true"
@@ -21,24 +23,21 @@
         <activity android:name=".LaunchActivity" />
         <activity android:name=".MainActivity" />
         <activity
-            android:name=".SettingsActivity"
-            android:label="@string/title_activity_settings" />
-        <activity
-            android:name=".barcodereader.BarcodeCaptureActivity"
-            android:label="@string/rental"
-            android:theme="@style/AppTheme.NoActionBar" />
-        <activity
             android:name=".Main2Activity"
-            android:label="@string/title_activity_main2"
+            android:label="@string/title_rental"
             android:theme="@style/AppTheme.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".SearchActivity" />
-        <activity android:name=".ListActivity"></activity>
+        <activity android:name=".SearchActivity"
+            android:label="@string/title_search"/>
+        <activity android:name=".ListActivity"
+            android:label="@string/title_list"/>
+        <activity
+            android:name=".SettingsActivity"
+            android:label="@string/title_settings" />
     </application>
 
 </manifest>

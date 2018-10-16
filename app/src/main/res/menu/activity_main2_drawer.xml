@@ -7,27 +7,27 @@
         <item
             android:id="@+id/nav_main"
             android:icon="@drawable/icon_rental"
-            android:title="貸出・返却" />
+            android:title="@string/title_rental" />
         <item
             android:id="@+id/nav_register"
             android:icon="@drawable/icon_new"
-            android:title="蔵書登録" />
+            android:title="@string/title_new" />
         <item
             android:id="@+id/nav_search"
             android:icon="@drawable/icon_search"
-            android:title="蔵書検索" />
+            android:title="@string/title_search" />
         <item
             android:id="@+id/nav_list"
             android:icon="@drawable/icon_list"
-            android:title="貸出リスト" />
+            android:title="@string/title_list" />
     </group>
 
-    <item android:title="設定">
+    <item android:title="@string/category_settings">
         <menu>
             <item
                 android:id="@+id/nav_config"
                 android:icon="@drawable/ic_menu_manage"
-                android:title="設定" />
+                android:title="@string/title_settings" />
         </menu>
     </item>
 

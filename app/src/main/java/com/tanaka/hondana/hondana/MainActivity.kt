@@ -1,8 +1,10 @@
 package com.tanaka.hondana.hondana
 
+import android.content.DialogInterface
 import android.graphics.Bitmap
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.support.v7.app.AlertDialog
 import android.util.Log
 import android.view.View
 import android.widget.*
@@ -23,8 +25,8 @@ class MainActivity : AppCompatActivity() {
     private var mGraphicOverlay: GraphicOverlay<BarcodeGraphic>? = null
     */
 
-    var toBeBorrowed: Int? = null
-    var toBeReturned: Int? = null
+    private var toBeBorrowed: Int? = null
+    private var toBeReturned: Int? = null
     var userAccount: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,30 +42,39 @@ class MainActivity : AppCompatActivity() {
 
         val getBookStockAsync = GetBookStockAsync()
         getBookStockAsync.setOnCallBack(object : GetBookStockAsync.CallBackTask() {
-            override fun callBack(result: String) {
+            override fun callBack(result: String?) {
                 super.callBack(result)
-                Log.d("AsyncTaskCallBack", result)
-                val bookStock = BookStock(result, userAccount!!)
-                findViewById<ProgressBar>(R.id.progressBar).visibility = View.INVISIBLE
-                applyData(bookStock)
+                if (result == null) {
+                    finishWithError()
+                }else{
+                    val bookStock = BookStock(result, userAccount!!)
+                    findViewById<ProgressBar>(R.id.progressBar).visibility = View.INVISIBLE
+                    applyData(bookStock)
+                }
             }
         })
         val getCoverImageAsync = GetCoverImageAsync()
         getCoverImageAsync.setOnCallBack(object : GetCoverImageAsync.CallBackTask() {
-            override fun callBack(result: Bitmap) {
+            override fun callBack(result: Bitmap?) {
                 super.callBack(result)
-                Log.d("AsyncTaskCallBack", "downloadOK")
-                findViewById<ProgressBar>(R.id.progressBarImage).visibility = View.INVISIBLE
-                findViewById<ImageView>(R.id.img).setImageBitmap(result)
+                if (result != null) {
+                    findViewById<ProgressBar>(R.id.progressBarImage).visibility = View.INVISIBLE
+                    findViewById<ImageView>(R.id.img).setImageBitmap(result)
+                }
             }
         })
 
         val bookBorrowReturnAsync = BookBorrowReturnAsync()
         bookBorrowReturnAsync.setOnCallBack(object : BookBorrowReturnAsync.CallBackTask() {
-            override fun callBack(result: String) {
+            override fun callBack(result: String?) {
                 super.callBack(result)
-                Log.d("BookBorrowReturnAsync", result)
-                finish()
+                if (result == null) {
+                    finishWithError()
+                }else {
+                    //FIXME: 正常に動かない。
+                    //Toast.makeText(this, "処理が正常終了しました。", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
             }
         })
 
@@ -99,4 +110,19 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.buttonBorrow).isEnabled = bookStock.canBorrow
         findViewById<Button>(R.id.buttonReturn).isEnabled = bookStock.canReturn
     }
+
+    private fun finishWithError(){
+        AlertDialog.Builder(this).apply {
+            setTitle("通信エラー")
+            setMessage("""
+                            通信エラーが発生しました。
+                            通信状況を確認してください。
+                        """.trimIndent())
+            setPositiveButton("OK", DialogInterface.OnClickListener { _, _ ->
+                finish()
+            })
+            show()
+    }
+}
+
 }

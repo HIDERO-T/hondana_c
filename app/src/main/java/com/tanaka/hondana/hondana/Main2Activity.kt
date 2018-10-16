@@ -6,6 +6,7 @@ import android.accounts.AccountManager.*
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.PendingIntent.getActivity
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
@@ -61,15 +62,12 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main2)
-//        setSupportActionBar(toolbar)
-
 
         val toggle = ActionBarDrawerToggle(
                 this, drawer_layout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close)
         drawer_layout.addDrawerListener(toggle)
         toggle.syncState()
 
-        //separator
 
         nav_view.setNavigationItemSelectedListener(this)
         mPreview = findViewById<View>(R.id.preview) as CameraSourcePreview
@@ -81,7 +79,7 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
 
         // Check for the camera permission before accessing the camera.  If the
         // permission is not granted yet, request permission.
-        var lst: MutableList<String> = mutableListOf()
+        val lst: MutableList<String> = mutableListOf()
         var rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
         if (rc == PackageManager.PERMISSION_GRANTED) {
             createCameraSource(autoFocus, useFlash)
@@ -99,13 +97,6 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         gestureDetector = GestureDetector(this, CaptureGestureListener())
         scaleGestureDetector = ScaleGestureDetector(this, ScaleListener())
 
-        if(Build.VERSION.SDK_INT <= 22){
-            userAccount = AccountManager.get(this).getAccountsByType("com.google")[0].name
-        }else if(Build.VERSION.SDK_INT >= 23){
-            val intent: Intent = AccountManager.newChooseAccountIntent(null, null, arrayOf("com.google"), null, null, null,
-                    null)
-            startActivityForResult(intent, REQUEST_CODE)
-        }
     }
 
     override fun onBackPressed() {
@@ -155,13 +146,11 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         drawer_layout.closeDrawer(GravityCompat.START)
         return true
     }
-    //sep
 
     private fun requestPermission(lst: MutableList<String>){
         Log.w( Main2Activity.TAG, "Some permission is not granted. Requesting permission")
 
         val permissions = lst.toTypedArray()
-
         if (!ActivityCompat.shouldShowRequestPermissionRationale(this,
                         Manifest.permission.CAMERA)) {
             ActivityCompat.requestPermissions(this, permissions, Main2Activity.RC_HANDLE_CAMERA_PERM)
@@ -169,7 +158,6 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         }
 
         val thisActivity = this
-
         val listener = View.OnClickListener {
             ActivityCompat.requestPermissions(thisActivity, permissions,
                     Main2Activity.RC_HANDLE_CAMERA_PERM)
@@ -180,30 +168,71 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
                 Snackbar.LENGTH_INDEFINITE)
                 .setAction("OK", listener)
                 .show()
-
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, intent)
         if (requestCode == REQUEST_CODE) {
             val received = data!!
-            userAccount = received.extras.get(KEY_ACCOUNT_NAME).toString()
-            Toast.makeText(this, "${userAccount}でログインしました。", Toast.LENGTH_LONG).show()
-            findViewById<TextView>(R.id.textAccount).text = userAccount
+            val accountMail = received.extras.get(KEY_ACCOUNT_NAME).toString()
+            login(accountMail)
         }
     }
 
+    private fun login(accountMail: String){
+        Log.d(TAG, accountMail)
+        Toast.makeText(this, "${accountMail}でログインしました。", Toast.LENGTH_LONG).show()
+        userAccount = accountMail
+        val navigationView = findViewById<View>(R.id.nav_view) as NavigationView
+        val headerView = navigationView.getHeaderView(0)
+        headerView.findViewById<TextView>(R.id.textAccount).text = userAccount
+        headerView.findViewById<TextView>(R.id.textName).text = extractName(userAccount!!)
+    }
+
+    private fun terminate() {
+        AlertDialog.Builder(this).apply {
+            setTitle("アカウントエラー")
+            setMessage("""
+                        有効なアカウントがありません。
+                        会社アドレスを端末に登録してください。
+                    """.trimIndent())
+            setPositiveButton("OK", DialogInterface.OnClickListener { _, _ ->
+                moveTaskToBack(true)
+            })
+            show()
+            }
+        }
+
     override fun onResume() {
         super.onResume()
+        if (userAccount == null) {
+            if (Build.VERSION.SDK_INT <= 22) {
+                Log.d(TAG, AccountManager.get(this).getAccountsByType("com.google").size.toString())
+                val accountAddress: String? = if (AccountManager.get(this).getAccountsByType("com.google") != null) {
+                    AccountManager.get(this).getAccountsByType("com.google").firstOrNull { isRLAddress(it.name) }?.name
+                } else {
+                    null
+                }
+
+                if (accountAddress != null) {
+                    login(accountAddress)
+                } else {
+                    terminate()
+                }
+            } else if (Build.VERSION.SDK_INT >= 23) {
+                val intent: Intent = AccountManager.newChooseAccountIntent(null, null, arrayOf("com.google"), null, null, null,
+                        null)
+                startActivityForResult(intent, REQUEST_CODE)
+            }
+        }
+
         findViewById<ProgressBar>(R.id.progressBar2).visibility = View.INVISIBLE
         startCameraSource()
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         val b = scaleGestureDetector!!.onTouchEvent(e)
-
         val c = gestureDetector!!.onTouchEvent(e)
-
         return b || c || super.onTouchEvent(e)
     }
 
@@ -314,12 +343,12 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
                                             permissions: Array<String>,
                                             grantResults: IntArray) {
         if (requestCode == RC_ACCOUNT){
-            if (grantResults.size != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED){
                 Log.d(TAG, "Account permission granted")
                 return
             }
         } else if (requestCode == RC_HANDLE_CAMERA_PERM) {
-            if (grantResults.size != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.d(TAG, "BOTh permission granted - initialize the camera source")
                 // we have permission, so create the camerasource
                 val autoFocus = intent.getBooleanExtra(AutoFocus, false)
@@ -334,7 +363,7 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         }
 
         Log.e(TAG, "Permission not granted: results len = " + grantResults.size +
-                " Result code = " + if (grantResults.size > 0) grantResults[0] else "(empty)")
+                " Result code = " + if (grantResults.isNotEmpty()) grantResults[0] else "(empty)")
 
         val listener = DialogInterface.OnClickListener { dialog, id -> finish() }
 
@@ -480,29 +509,37 @@ class Main2Activity : AppCompatActivity(), NavigationView.OnNavigationItemSelect
         if (!isIsbn(barcode.rawValue)) return
 
         //TODO: フラグメントどうするか検討。
-        val intent: Intent = Intent(this, MainActivity::class.java)
+        val intent = Intent(this, MainActivity::class.java)
         intent.putExtra("barcode", barcode.rawValue)
         intent.putExtra("userAccount", userAccount)
         startActivity(intent)
     }
 
     private fun isIsbn(barcode: String) = Pattern.compile("^97[89]").matcher(barcode).find()
+    private fun isRLAddress(address: String) = Pattern.compile("@r-learning.co.jp$").matcher(address).find()
+
+    private fun extractName(address: String): String {
+        val matcher = Pattern.compile("""(.+)@r-learning.co.jp$""").matcher(address)
+        if (matcher.find())
+            return matcher.group(1)
+        else
+            throw IllegalStateException("No match found.")
+    }
 
     override fun onFragmentInteraction(uri: Uri) {
     }
 
     companion object {
-        private val TAG = "MainActivity2"
+        private const val TAG = "MainActivity2"
 
         // intent request code to handle updating play services if needed.
-        private val RC_HANDLE_GMS = 9001
-
+        private const val RC_HANDLE_GMS = 9001
         // permission request codes need to be < 256
-        private val RC_HANDLE_CAMERA_PERM = 2
+        private const val RC_HANDLE_CAMERA_PERM = 2
 
-        private val RC_ACCOUNT = 15
+        private const val RC_ACCOUNT = 15
 
-        private val REQUEST_CODE = 4
+        private const val REQUEST_CODE = 4
         // constants used to pass extra data in the intent
         val AutoFocus = "AutoFocus"
         val UseFlash = "UseFlash"

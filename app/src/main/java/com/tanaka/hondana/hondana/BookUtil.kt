@@ -8,18 +8,11 @@ import java.util.*
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
-import android.os.AsyncTask.execute
-import android.provider.Settings.Global.getString
 import android.util.Log
-import com.tanaka.hondana.hondana.GetBookStockAsync.CallBackTask
-import java.lang.Thread.sleep
 import org.json.JSONObject
-import java.nio.file.Files.size
-
 
 const val BASE_ADDR: String = "http://125.12.14.155:3000"
 
-//TODO: Nullableでない設計に変更スべき。
 class Book(data: JSONObject){
     var id: Int = 0
     var holder: String = ""
@@ -79,21 +72,17 @@ class GetBookStockAsync : AsyncTask<String, Void, String>() {
     private var callbacktask: CallBackTask? = null
 
     override fun doInBackground(vararg params: String): String? {
-        var con: HttpURLConnection? = null
-        var url: URL? = null
-
         try {
-            url = URL(BASE_ADDR + "/api/books/isbn/${params[0]}")
-            con = url!!.openConnection() as HttpURLConnection
-            con!!.setRequestMethod("GET")
-            con!!.setInstanceFollowRedirects(false)
-            con!!.setDoInput(true)
-            con!!.setDoOutput(false)
+            val url = URL(BASE_ADDR + "/api/books/isbn/${params[0]}")
+            val con = url.openConnection() as HttpURLConnection
+            con.requestMethod = "GET"
+            con.instanceFollowRedirects = false
+            con.doInput = true
+            con.doOutput= false
             con.connect()
 
-            val `in` = con.getInputStream()
-            val readSt = readInputStream(`in`)
-            return readSt
+            val input = con.inputStream
+            return readInputStream(input)
         } catch (e: MalformedURLException) {
             e.printStackTrace()
         } catch (e: IOException) {
@@ -102,7 +91,7 @@ class GetBookStockAsync : AsyncTask<String, Void, String>() {
         return null
     }
 
-    override fun onPostExecute(result: String) {
+    override fun onPostExecute(result: String?) {
         super.onPostExecute(result)
         callbacktask!!.callBack(result)
     }
@@ -113,29 +102,25 @@ class GetBookStockAsync : AsyncTask<String, Void, String>() {
         private const val TAG = "GetBookStockAsync"
     }
     open class CallBackTask {
-        open fun callBack(result: String) {}
+        open fun callBack(result: String?) {}
     }
 }
 class GetCoverImageAsync : AsyncTask<String, Void, Bitmap>() {
     private var callbacktask: CallBackTask? = null
 
     override fun doInBackground(vararg params: String): Bitmap? {
-        var con: HttpURLConnection? = null
-        var url: URL? = null
-
         try {
-            url = URL(BASE_ADDR + "/api/images/${params[0]}")
-            con = url!!.openConnection() as HttpURLConnection
-            con!!.setRequestMethod("GET")
-            con!!.setInstanceFollowRedirects(false)
-            con!!.setDoInput(true)
-            con!!.setDoOutput(false)
+            val url = URL(BASE_ADDR + "/api/images/${params[0]}")
+            val con = url.openConnection() as HttpURLConnection
+            con.requestMethod = "GET"
+            con.instanceFollowRedirects = false
+            con.doInput = true
+            con.doOutput = false
             con.connect()
 
-            val `in` = con.getInputStream()
+            val input = con.inputStream
             Log.d(TAG, "GET OK.")
-            val bitmap = BitmapFactory.decodeStream(`in`)
-            return bitmap
+            return BitmapFactory.decodeStream(input)
         } catch (e: MalformedURLException) {
             e.printStackTrace()
         } catch (e: IOException) {
@@ -144,7 +129,7 @@ class GetCoverImageAsync : AsyncTask<String, Void, Bitmap>() {
         return null
     }
 
-    override fun onPostExecute(result: Bitmap) {
+    override fun onPostExecute(result: Bitmap?) {
         super.onPostExecute(result)
         callbacktask!!.callBack(result)
     }
@@ -155,7 +140,7 @@ class GetCoverImageAsync : AsyncTask<String, Void, Bitmap>() {
         private const val TAG = "GetCoverImageAsync"
     }
     open class CallBackTask {
-        open fun callBack(result: Bitmap) {}
+        open fun callBack(result: Bitmap?) {}
     }
 }
 
@@ -163,39 +148,34 @@ class BookBorrowReturnAsync : AsyncTask<String, Void, String>() {
     private var callbacktask: CallBackTask? = null
 
     override fun doInBackground(vararg params: String): String? {
-        var con: HttpURLConnection? = null
-        var url: URL? = null
         val id = params[1].toInt()
-        val param = if (params[0] == BORROW) {
-            "id=$id&user=${params[2]}"
-        }else if (params[0] == RETURN){
-            "id=$id"
-        }else{
-            throw RuntimeException()
+        val requestParam = when (params[0]){
+            BORROW -> "id=$id&user=${params[2]}"
+            RETURN -> "id=$id"
+            else -> throw RuntimeException()
         }
 
         try {
-            url = URL(BASE_ADDR + "/api/books/${params[0]}")
-            con = url!!.openConnection() as HttpURLConnection
-            con!!.setRequestMethod("POST")
-            con!!.setInstanceFollowRedirects(false)
-            con!!.setDoInput(true)
-            con!!.setDoOutput(true)
+            val url = URL(BASE_ADDR + "/api/books/${params[0]}")
+            val con = url.openConnection() as HttpURLConnection
+            con.requestMethod = "POST"
+            con.instanceFollowRedirects = false
+            con.doInput = true
+            con.doOutput = true
             con.connect()
             Log.d(TAG,"Connection OK")
 
-            val outputStream = con.getOutputStream()
-            val ps = PrintStream(con.getOutputStream())
-            ps.print(param)
+            val outputStream = con.outputStream
+            val ps = PrintStream(con.outputStream)
+            ps.print(requestParam)
             ps.close()
             outputStream.close()
             Log.d(TAG, "Output OK")
 
-            Log.d(TAG, "Status: ${con.getResponseCode()}")
-            val `in` = con.getInputStream()
+            Log.d(TAG, "Status: ${con.responseCode}")
+            val input = con.inputStream
             Log.d(TAG, "GET OK.")
-            val readSt = readInputStream(`in`)
-            return readSt
+            return readInputStream(input)
         } catch (e: MalformedURLException) {
             e.printStackTrace()
         } catch (e: IOException) {
@@ -204,7 +184,7 @@ class BookBorrowReturnAsync : AsyncTask<String, Void, String>() {
         return null
     }
 
-    override fun onPostExecute(result: String) {
+    override fun onPostExecute(result: String?) {
         super.onPostExecute(result)
         callbacktask!!.callBack(result)
     }
@@ -217,25 +197,49 @@ class BookBorrowReturnAsync : AsyncTask<String, Void, String>() {
         private const val RETURN = "return"
     }
     open class CallBackTask {
-        open fun callBack(result: String) {}
+        open fun callBack(result: String?) {}
     }
 }
 
 @Throws(IOException::class, UnsupportedEncodingException::class)
-fun readInputStream(`in`: InputStream): String {
+fun readInputStream(input: InputStream): String {
     val sb = StringBuffer()
-    var st: String? = ""
+    var st: String?
 
-    val br = BufferedReader(InputStreamReader(`in`, "UTF-8"))
+    val br = BufferedReader(InputStreamReader(input, "UTF-8"))
     st = br.readLine()
     while (st != null) {
         sb.append(st)
         st = br.readLine()
     }
     try {
-        `in`.close()
+        input.close()
     } catch (e: Exception) {
         e.printStackTrace()
     }
     return sb.toString()
+}
+
+class RowData {
+    var title: String = "タイトル"
+    var author: String = "著者"
+    var status: Int = STATUS_UNKNOWN
+    var isEnabled: Boolean = false
+
+    init {
+        isEnabled = status == STATUS_AVAILABLE || status == STATUS_ONLOAN
+    }
+    companion object {
+        const val STATUS_UNKNOWN = 0
+        const val STATUS_AVAILABLE = 1
+        const val STATUS_ONLOAN = 2
+        const val STATUS_NONE = 3
+    }
+}
+
+class ListRowData {
+    var title: String = "タイトル"
+    var author: String = "著者"
+    var borrowDay: Date = Date()
+    var returnDay: Date = Date()
 }
