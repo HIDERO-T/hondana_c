@@ -220,22 +220,6 @@ fun readInputStream(input: InputStream): String {
     return sb.toString()
 }
 
-class RowData {
-    var title: String = "タイトル"
-    var author: String = "著者"
-    var status: Int = STATUS_UNKNOWN
-    var isEnabled: Boolean = false
-
-    init {
-        isEnabled = status == STATUS_AVAILABLE || status == STATUS_ONLOAN
-    }
-    companion object {
-        const val STATUS_UNKNOWN = 0
-        const val STATUS_AVAILABLE = 1
-        const val STATUS_ONLOAN = 2
-        const val STATUS_NONE = 3
-    }
-}
 
 class ListRowData {
     var title: String = "タイトル"

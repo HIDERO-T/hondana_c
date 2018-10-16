@@ -9,7 +9,7 @@ import android.view.ViewGroup
  * Created by naoi on 2017/04/25.
  */
 
-class CasarealRecycleViewAdapter(private val list: List<RowData>) : RecyclerView.Adapter<CasarealViewHolder>() {
+class CasarealRecycleViewAdapter(private val list: List<BookData>) : RecyclerView.Adapter<CasarealViewHolder>() {
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CasarealViewHolder {
         val inflate = LayoutInflater.from(parent.context).inflate(R.layout.item_search, parent, false)
         return CasarealViewHolder(inflate)
